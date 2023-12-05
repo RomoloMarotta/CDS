@@ -6,13 +6,14 @@
 
 typedef struct Node {
     int data;
-    struct Node* next;
+    struct Node* volatile next;
 } Node;
 
 typedef struct {
     Node* top;
     pthread_mutex_t mutex;
     pthread_spinlock_t lock;
+    char pad[64-sizeof(pthread_mutex_t)- sizeof(pthread_spinlock_t) -sizeof(void*)];
 } Stack;
 
 void init(Stack* stack, int n);

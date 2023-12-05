@@ -5,9 +5,15 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include "clock_constant.h"
+
+
+
+int RATE = 1;
 
 typedef struct {
     Stack* stack;
+    struct drand48_data seed;
     int operationCount;
 } ThreadData;
 
@@ -20,15 +26,23 @@ void* sleepThreadFunction(void* arg) {
     return NULL;
 }
 
+void wait_active(){
+    unsigned long long wait;
+    wait=CLOCK_READ();
+    while( (CLOCK_READ()-wait) < (CLOCKS_PER_US*RATE) );
+}
+
 void* threadFunction(void* arg) {
     ThreadData* threadData = (ThreadData*)arg;
     Stack* stack = threadData->stack;
-
     while (!stop) {
-        int operation = rand() % 2;
+        int r = rand();
+        //long r = 0; lrand48_r(&threadData->seed, &r);
+        wait_active();
+        int operation = r % 2;
 
         if (operation == 0) {
-            push(stack, rand() % 100);
+            push(stack, r % 100);
         } else {
             pop(stack);
         }
@@ -40,14 +54,15 @@ void* threadFunction(void* arg) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s <number_of_threads> <initial_elements> <sleep_time>\n", argv[0]);
+    if (argc != 5) {
+        fprintf(stderr, "Usage: %s <number_of_threads> <initial_elements> <sleep_time> <us_wait>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     int numThreads = atoi(argv[1]);
     int initialElements = atoi(argv[2]);
     int sleepTime = atoi(argv[3]);
+    RATE = atoi(argv[4]);
 
     if (numThreads <= 0 || initialElements < 0 || sleepTime < 0) {
         fprintf(stderr, "Invalid number of threads, initial elements, or sleep time\n");
@@ -63,6 +78,7 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < numThreads; ++i) {
         threadData[i].stack = &stack;
         threadData[i].operationCount = 0;
+        srand48_r(i,&threadData[i].seed);
     }
 
     if (pthread_create(&sleepThread, NULL, sleepThreadFunction, &sleepTime) != 0) {
