@@ -3,10 +3,12 @@ CFLAGS = -pthread
 
 all: mutex_stack spinl_stack treib_stack
 
-%: main.c %.c
-	$(CC) $(CFLAGS) -o $@ $^
+%: main.c %.c stack.h clock_constant.h
+	$(CC) $(CFLAGS) -o $@ $^ -g
 
+clock_constant.h:
+	./gen_clock_header.sh
 
 
 clean:
-	rm -f main
+	rm -f *_stack
