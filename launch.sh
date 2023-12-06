@@ -5,9 +5,9 @@
 
 MAX_THREADS=$( cat /proc/cpuinfo | grep processor | wc -l)     #maximum number of threads, which is typically equal to the number of (logical) cores.
 QUARTER=$(($MAX_THREADS/4))
-thl="1 2 $((QUARTER/2)) $QUARTER $((QUARTER*2)) $((QUARTER*3)) $MAX_THREADS $(($MAX_THREADS * 2))"    #thread counts to be used for scalability charts
+thl="1 $((QUARTER/2)) $QUARTER $((QUARTER*2)) $((QUARTER*3)) $MAX_THREADS $(($MAX_THREADS * 2))"    #thread counts to be used for scalability charts
 
-sl="mutex spinl treib tr_bo"
+sl="mutex spinl treib tr_bo elimi"
 
 echo -ne  "TH ideal"
 for s in $sl; do

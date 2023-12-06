@@ -5,17 +5,20 @@
 #include <pthread.h>
 
 #define COLLISION_SIZE 20
+#define MAX_THREAD     1024
+
+#define PUSH 0
+#define POP  1
 
 typedef struct Node {
-    int data;
     struct Node* volatile next;
+    int data;
 } Node;
 
 typedef struct {
-   void *payload;
-   int tid;
-   int oid;
-   char pad[64-16];
+   Node payload;
+   int op_type;
+   pthread_t id;
 } Collision;
 
 
@@ -24,7 +27,8 @@ typedef struct {
     pthread_mutex_t mutex;
     pthread_spinlock_t lock;
     char pad[64-sizeof(pthread_mutex_t)- sizeof(pthread_spinlock_t) -sizeof(void*)];
-    Collision *cells[COLLISION_SIZE];
+    volatile int collisions_arr[COLLISION_SIZE];
+    Collision *volatile locations_arr[MAX_THREAD];
 } Stack;
 
 

@@ -7,17 +7,28 @@
 #define UNROLL 100
 #define ITERS  8
 
+#define TRY_FAILED -2
+#define EMPTY      -1
+#define OK          1
+
 __thread int   local_allocs = 1;
-__thread Node* local_ptr = NULL;
-__thread int initr = 0;
+__thread Collision* local_ptr = NULL;
+__thread int mid = 0;
 __thread struct drand48_data randBuffer;
-__thread Collision;
 
 volatile int gid = 0;
 
-void init(Stack* stack, int n) {
-    stack->top = NULL;
+void per_thread_init(){
+    srand48_r(time(NULL), &randBuffer); 
+    mid = __sync_add_and_fetch(&gid, 1);
+    if(mid == (MAX_THREAD)){
+        printf("too much threads\n");
+        exit(1);
+    } 
+}
 
+void init(Stack* stack, int n) {
+    bzero(stack, sizeof(Stack));
     for (int i = n; i > 0; --i) {
         push(stack, i);
     }
@@ -40,72 +51,145 @@ void backoff(int cnt, int max){
 
 long get_rand(){
 long r = 0;   lrand48_r(&randBuffer, &r);
-r = r % COLLISION_SIE;
+r = r % COLLISION_SIZE;
 return r;
 }
 
 
 int try_push(Stack* stack, Node *newNode) {
     newNode->next = stack->top;
-    return __sync_bool_compare_and_swap(&stack->top, newNode->next, newNode));
+    if(__sync_bool_compare_and_swap(&stack->top, newNode->next, newNode)) return OK;
+    return TRY_FAILED;
 }
 
 int try_pop(Stack* stack){
-    Node* topNode;
-
-    topNode = stack->top;
-    if (topNode == NULL) {
-       return -1; // Stack is empty
-    }
+    Node* topNode = stack->top;
+    
+    if (topNode == NULL) return EMPTY; // Stack is empty
+    
     if (__sync_bool_compare_and_swap(&stack->top, topNode, topNode->next))
        return topNode->data;
-    return -2;
+    
+    return TRY_FAILED;
 }
 
 
+int try_collision(Stack *stack, Collision *mine, Collision *his, int him){
+    int res = TRY_FAILED;
+    if(mine->op_type == PUSH){ // mine is a push
+        if(__sync_bool_compare_and_swap(&stack->locations_arr[him], his, mine))
+            res = OK;
+    }
+    else{ //mine is a pop
+        if(__sync_bool_compare_and_swap(&stack->locations_arr[him], his, NULL)){
+            stack->locations_arr[mid] = 0;
+            res = his->payload.data;
+        }
+    }
+    return res;
+}
 
 
+int elimination_op(Stack* stack, Collision* mystr, int cnt){
+    Collision *histr;
+    long pos = get_rand();
+    int him  = stack->collisions_arr[mid];
+    int res = TRY_FAILED;
+    
+    mystr->id = mid;
+    stack->locations_arr[mid] = mystr;
+
+    do{
+        him = stack->collisions_arr[pos];
+    }while(!__sync_bool_compare_and_swap(&stack->collisions_arr[pos], him, mid));
+    
+    if(him){
+        histr = stack->locations_arr[him];
+        if(histr && histr->id == him && mystr->op_type != histr->op_type){
+            if(__sync_bool_compare_and_swap(&stack->locations_arr[mid], mystr, NULL)){
+                res = try_collision(stack, mystr, histr, him);
+            }
+            else{
+                if(mystr->op_type == PUSH) res = OK; // is a push
+                else{
+                        res = stack->locations_arr[mid]->payload.data; 
+                        stack->locations_arr[mid] = NULL;
+                }
+            }
+            goto out;     
+        }
+    }
+    
+    backoff(cnt, ITERS);
+    
+    if(!__sync_bool_compare_and_swap(&stack->locations_arr[mid], mystr, NULL) ){
+        if(mystr->op_type == PUSH) res = OK; // is a push
+        else{
+                res = stack->locations_arr[mid]->payload.data; 
+                stack->locations_arr[mid] = NULL;
+        }
+    }
+
+out:
+    return res;
+}
 
 
-void push(Stack* stack, int value) {
-    Node* newNode;
+Collision *c_alloc(){
     local_allocs--;
-    if(!initr) {initr=1;srand48_r(time(NULL), &randBuffer); gid = __sync_fetch_and_add(&gid, 1);}
+    if(!mid) per_thread_init();
 
     if(!local_allocs){
-      local_ptr = (Node*)malloc(sizeof(Node)*UNROLL);
+      local_ptr = (Collision*)malloc(sizeof(Collision)*UNROLL);
       if (local_ptr == NULL) {
         perror("Error allocating memory");
         exit(EXIT_FAILURE);
       }
       local_allocs = UNROLL-1;
     }
-    newNode = &local_ptr[local_allocs];
+    return &local_ptr[local_allocs];
+}
+
+void c_free_last(){
+local_allocs++;
+}
+
+void push(Stack* stack, int value) {
+    Node* newNode;
+    int cnt = 0, val = 0;
+    Collision *ts = c_alloc();
+
+
+    ts->op_type = PUSH;
+    newNode = (Node*) &local_ptr[local_allocs];
     newNode->data = value;
     
-    int cnt = 0;
     do {
-        if(try_push(stack, newNde)) break;
-	
-        backoff(cnt, ITERS);
-        cnt++;
+        if(try_push(stack, newNode) == OK) break;
+        val = elimination_op(stack, ts, cnt);
+        if(val != TRY_FAILED) break;
+	    cnt++;
         newNode->next = stack->top;
     } while (1);
+
+    return;
 }
 
 
 
 int pop(Stack* stack) {
-    int val;
-    if(!initr) {initr=1;srand48_r(time(NULL), &randBuffer);}
+    int val = 0, cnt = 0;
+    Collision *ts = c_alloc();
 
-    int cnt = 0;
+    ts->op_type = POP;
+
     do {
         val = try_pop(stack);
-        if(val != -2) break;
-        backoff(cnt, ITERS);
+        if(val != TRY_FAILED){ break;}
+        val = elimination_op(stack, ts, cnt);
+        if(val != TRY_FAILED) break;
         cnt++;
-    } while (!__sync_bool_compare_and_swap(&stack->top, topNode, topNode->next));
+    } while (1);
 
     //free(topNode);
     return val;
