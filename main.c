@@ -26,27 +26,32 @@ void* sleepThreadFunction(void* arg) {
     return NULL;
 }
 
-void wait_active(){
+void wait_active(long r){
     unsigned long long wait;
+//    r = r %(RATE*2);
+r = RATE;
     wait=CLOCK_READ();
-    while( (CLOCK_READ()-wait) < (CLOCKS_PER_US*RATE) );
+    while( (CLOCK_READ()-wait) < (CLOCKS_PER_US*r) );
 }
+
 
 void* threadFunction(void* arg) {
     ThreadData* threadData = (ThreadData*)arg;
     Stack* stack = threadData->stack;
     while (!stop) {
-        int r = rand();
-        //long r = 0; lrand48_r(&threadData->seed, &r);
-        wait_active();
+        //int r = rand();
+        long r = 0; lrand48_r(&threadData->seed, &r);
+        wait_active(r);
         int operation = r % 2;
 
-        if (operation == 0) {
+        if (operation)
             push(stack, r % 100);
-        } else {
+        else
+       // wait_active();
             pop(stack);
-        }
 
+
+        //threadData->operationCount++;
         threadData->operationCount++;
     }
 

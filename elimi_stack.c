@@ -5,7 +5,8 @@
 #include "clock_constant.h"
 
 #define UNROLL 100
-#define ITERS  8
+#define ITERS  4
+#define MAX    16
 
 #define TRY_FAILED -2
 #define EMPTY      -1
@@ -24,7 +25,8 @@ void per_thread_init(){
     if(mid == (MAX_THREAD)){
         printf("too much threads\n");
         exit(1);
-    } 
+    }
+    mid *= CACHE_MULT_L;
 }
 
 void init(Stack* stack, int n) {
@@ -39,11 +41,14 @@ int isEmpty(Stack* stack) {
 }
 
 void backoff(int cnt, int max){
+        max = max << (cnt+1);
+	if(max > MAX) max = max;
         if(cnt && ITERS){
            unsigned long long wait = CLOCK_READ();
            long r = 0;   lrand48_r(&randBuffer, &r);
-           r = r % ( max << (cnt+1));
-           r = CLOCKS_PER_US*r;
+           //r = r % max;
+           if(r<0)r*=-1;
+           r = r % (CLOCKS_PER_US*MAX);
            while((CLOCK_READ()-wait) < r);
         }
 }
@@ -82,8 +87,9 @@ int try_collision(Stack *stack, Collision *mine, Collision *his, int him){
     }
     else{ //mine is a pop
         if(__sync_bool_compare_and_swap(&stack->locations_arr[him], his, NULL)){
-            stack->locations_arr[mid] = 0;
             res = his->payload.data;
+            stack->locations_arr[mid] = NULL;
+	    //if(res == TRY_FAILED){printf("ARGh\n");}
         }
     }
     return res;
@@ -92,17 +98,20 @@ int try_collision(Stack *stack, Collision *mine, Collision *his, int him){
 
 int elimination_op(Stack* stack, Collision* mystr, int cnt){
     Collision *histr;
-    long pos = get_rand();
-    int him  = stack->collisions_arr[mid];
+    int him;
+    long pos = get_rand() * CACHE_MULT_C;
     int res = TRY_FAILED;
     
     mystr->id = mid;
     stack->locations_arr[mid] = mystr;
 
+begin:
+
     do{
         him = stack->collisions_arr[pos];
     }while(!__sync_bool_compare_and_swap(&stack->collisions_arr[pos], him, mid));
     
+if(!him) goto begin;
     if(him){
         histr = stack->locations_arr[him];
         if(histr && histr->id == him && mystr->op_type != histr->op_type){
@@ -114,6 +123,7 @@ int elimination_op(Stack* stack, Collision* mystr, int cnt){
                 else{
                         res = stack->locations_arr[mid]->payload.data; 
                         stack->locations_arr[mid] = NULL;
+                        
                 }
             }
             goto out;     
@@ -168,8 +178,7 @@ void push(Stack* stack, int value) {
         if(try_push(stack, newNode) == OK) break;
         val = elimination_op(stack, ts, cnt);
         if(val != TRY_FAILED) break;
-	    cnt++;
-        newNode->next = stack->top;
+        cnt+=2;
     } while (1);
 
     return;
@@ -185,7 +194,9 @@ int pop(Stack* stack) {
 
     do {
         val = try_pop(stack);
-        if(val != TRY_FAILED){ break;}
+        if(val != TRY_FAILED) break;
+        val = try_pop(stack);
+        if(val != TRY_FAILED) break;
         val = elimination_op(stack, ts, cnt);
         if(val != TRY_FAILED) break;
         cnt++;

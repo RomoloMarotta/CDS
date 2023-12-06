@@ -22,13 +22,16 @@ typedef struct {
 } Collision;
 
 
+#define CACHE_MULT_C 32
+#define CACHE_MULT_L 32
+
 typedef struct {
     Node* top;
     pthread_mutex_t mutex;
     pthread_spinlock_t lock;
     char pad[64-sizeof(pthread_mutex_t)- sizeof(pthread_spinlock_t) -sizeof(void*)];
-    volatile int collisions_arr[COLLISION_SIZE];
-    Collision *volatile locations_arr[MAX_THREAD];
+    volatile int collisions_arr[COLLISION_SIZE*CACHE_MULT_C];
+    Collision *volatile locations_arr[MAX_THREAD*CACHE_MULT_L];
 } Stack;
 
 
