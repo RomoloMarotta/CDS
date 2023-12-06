@@ -5,6 +5,7 @@
 #define CHAINED		1
 #define OPTIMISTIC	2
 #define LOCKFREE	3
+#define IDEAL           4
 
 #ifndef LOCK_MODE 
 #define LOCK_MODE 0

@@ -9,22 +9,25 @@ middle=last_block+"|"
 
 uno="_"*5+"1"+"_"*5
 due="_"*5+"2"+"_"*5
-tre="_"*5+"4"+"_"*5
-qua="_"*5+"8"+"_"*5
-cin="_"*5+"16"+"_"*4
-sei="_"*5+"32"+"_"*4
+tre="_"*5+"5"+"_"*5
+qua="_"*5+"10"+"_"*4
+cin="_"*5+"20"+"_"*4
+sei="_"*5+"30"+"_"*4
+set="_"*5+"40"+"_"*4
+ott="_"*5+"80"+"_"*4
 
 
 pes=" "*2+"PESSIMISTIC"+" "*2
 
-print(" "*15+"_"*11*6+"_____")
-print(" "*14+"|"+"_"*11*2+"________#THREADS___________"+"_"*11*2+"|")
-print(" "+"_"*13+"|"+uno+"|"+due+"|"+tre+"|"+qua+"|"+cin+"|"+sei+"|")
+print(" "*15+"_"*11*8+"_______")
+print(" "*14+"|"+"_"*11*3+"________#THREADS___________"+"_"*11*3+"__|")
+print(" "+"_"*13+"|"+uno+"|"+due+"|"+tre+"|"+qua+"|"+cin+"|"+sei+"|"+set+"|"+ott+"|")
 #print "|"+space*1+"|"+space*4+last_space+"|"
 #print "|"+space*1+"|"+space*4+last_space+"|"
 #print "|"+space*1+"|"+space*4+last_space+"|"
 #print "|"+last_block*1+"|"+block*4+last_block+"|"
 
+os.system('./ideal')
 os.system('./pessimistic')
 os.system('./chained')
 os.system('./optimistic')

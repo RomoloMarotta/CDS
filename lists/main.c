@@ -8,9 +8,9 @@
 
 #define KEY_MAX_VALUE 	(0x3ff)
 #define KEY_MIN_VALUE 	(0)
-#define ITERATIONS		5
+#define ITERATIONS		8 //5
 #define MAX_THREADS		(1<<ITERATIONS)
-#define SECONDS			2
+#define SECONDS			1
 #define ITEMS			(0x1ff+1)
 
 volatile bool stop = false;
@@ -20,6 +20,8 @@ volatile long ops = 0;
 ll_set *gset = NULL;
 
 pthread_t ptids[MAX_THREADS];
+
+int thread_count[8]={1, 2, 5, 10, 20, 30, 40, 80};
 
 void* stress_test(void *arg){
 	struct drand48_data buffer;
@@ -63,24 +65,26 @@ int main(){
 	printf("|     CHAINED ");
 #elif LOCK_MODE == OPTIMISTIC
 	printf("|  OPTIMISTIC ");
-#else
+#elif LOCK_MODE == LOCKFREE
 	printf("|   LOCK-FREE ");
+#else
+	printf("|   IDEAL     ");
 #endif
 	printf("|");
-	for(i=1;i<=MAX_THREADS;i<<=1)
+	for(i=0;i<8;i++)
 	{
 		fflush(stdout);
+#if LOCK_MODE != IDEAL
 
 		ops = 0L;
 		stop = false;
 		end_barrier = 0;
 		barrier = 0;
+		__sync_bool_compare_and_swap(&end_barrier, 0, thread_count[i]+1);
 
-		__sync_bool_compare_and_swap(&end_barrier, 0, i+1);
-
-		for(j=0;j<i;j++)	pthread_create(ptids +j, NULL, stress_test, NULL);
+		for(j=0;j<thread_count[i];j++)	pthread_create(ptids +j, NULL, stress_test, NULL);
 		
-		while(barrier != i);
+		while(barrier != thread_count[i]);
 
 		__sync_fetch_and_add(&barrier, 1);
 		
@@ -88,12 +92,16 @@ int main(){
 		
 		__sync_bool_compare_and_swap(&stop, false, true);
 		
-		for(j=0;j<i;j++)	pthread_join(ptids[j],  NULL);
+		for(j=0;j<thread_count[i];j++)	pthread_join(ptids[j],  NULL);
+#else
+                ops = thread_count[i]*800000*SECONDS;
+#endif
 		key =  ops/SECONDS/1000;
-		printf("*");
-		if(key < 10) printf("***");		
-		else if(key < 100) printf("**");		
-		else if(key < 1000) printf("*");		
+		//printf("*");
+		if(key < 10) printf("****");		
+		else if(key < 100) printf("***");		
+		else if(key < 1000) printf("**");		
+		else if(key < 10000) printf("*");		
 		printf("%ld KOps*|", ops/SECONDS/1000);		
 	}
 	printf("\n");
