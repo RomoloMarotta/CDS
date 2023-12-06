@@ -1,5 +1,6 @@
 #!/bin/python3
 import os
+import sys
 
 block="_"*16
 last_block="_"*15
@@ -27,8 +28,7 @@ print(" "+"_"*13+"|"+uno+"|"+due+"|"+tre+"|"+qua+"|"+cin+"|"+sei+"|"+set+"|"+ott
 #print "|"+space*1+"|"+space*4+last_space+"|"
 #print "|"+last_block*1+"|"+block*4+last_block+"|"
 
-os.system('./ideal')
-os.system('./pessimistic')
-os.system('./chained')
-os.system('./optimistic')
-os.system('./lockfree')
+US=int(sys.argv[1])
+progs=['ideal', 'pessimistic', 'chained', 'optimistic', 'lockfree']
+for p in progs:
+  os.system(f'./{p} {US}')

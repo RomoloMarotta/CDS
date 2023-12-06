@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include "set.h"
+#include "clock_constant.h"
 
 #define KEY_MAX_VALUE 	(0x3ff)
 #define KEY_MIN_VALUE 	(0)
@@ -22,6 +23,7 @@ ll_set *gset = NULL;
 pthread_t ptids[MAX_THREADS];
 
 int thread_count[8]={1, 2, 5, 10, 20, 30, 40, 80};
+int TIME=0;
 
 void* stress_test(void *arg){
 	struct drand48_data buffer;
@@ -36,6 +38,8 @@ void* stress_test(void *arg){
 	while(stop == false){
 		lrand48_r(&buffer, &key);
 		insert(gset, key & KEY_MAX_VALUE);
+		long long wait = CLOCK_READ();
+                while( (CLOCK_READ()-wait) < (TIME*CLOCKS_PER_US) );
 		lrand48_r(&buffer, &key);
 		delete(gset, key & KEY_MAX_VALUE);
 		my_ops+=2;
@@ -46,10 +50,11 @@ void* stress_test(void *arg){
 }
 
 
-int main(){
+int main(int argc, char* argv[]){
 	struct drand48_data buffer;
 	int i,j;
 	long key;
+        TIME = atoi(argv[1]);
 	srand48_r(17, &buffer);
 	gset = init_ll_set(); 
 	
@@ -94,7 +99,7 @@ int main(){
 		
 		for(j=0;j<thread_count[i];j++)	pthread_join(ptids[j],  NULL);
 #else
-                ops = thread_count[i]*800000*SECONDS;
+                ops = thread_count[i]*40*(50/TIME)*1000*SECONDS;
 #endif
 		key =  ops/SECONDS/1000;
 		//printf("*");
